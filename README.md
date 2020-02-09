@@ -20,6 +20,7 @@ AWS Infrastructure which includes Web app + RDS + all the bits and pieces that m
 	- Give infra read access mode to relavant services and infra.
 	- Use roles when necessary.
 	- If possible protect from DDOS and flooding attacks.
+	- Monitor who makes changes to the infraestructure.
 
 
 ## Proposed architecture
