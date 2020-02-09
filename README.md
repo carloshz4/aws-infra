@@ -9,17 +9,17 @@ AWS Infrastructure which includes Web app + RDS + all the bits and pieces that m
 4. Provide the Web and DB instances logging and alarming via Cloudwatch (elaborate a bit more on this).
 5. Generate email notifications once any of the hosts exceeds 90% CPU usage, it is termated or becomes unavailable.
 6. Networking:
-- Use a VPC class B
-- Use multiple subnets class C
-- Use load Balancing
-- Restrict unnecesary ports and source IPs/networks. Only set up the minimun necesary
-- Consider GeoRedundancy
-- Restrict direct internet access to the hosts. 
+	- Use a VPC class B
+	- Use multiple subnets class C
+	- Use load Balancing
+	- Restrict unnecesary ports and source IPs/networks. Only set up the minimun necesary
+	- Consider GeoRedundancy
+	- Restrict direct internet access to the hosts. 
 7. Security:
-- Make sure only admin users can create, modify or delete infra.
-- Give infra read access mode to relavant services and infra.
-- Use roles when necessary.
-- If possible protect from DDOS and flooding attacks.
+	- Make sure only admin users can create, modify or delete infra.
+	- Give infra read access mode to relavant services and infra.
+	- Use roles when necessary.
+	- If possible protect from DDOS and flooding attacks.
 
 
 ## Proposed architecture
