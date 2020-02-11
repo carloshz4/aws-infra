@@ -32,15 +32,18 @@ AWS Infrastructure which includes Web app + RDS + all the bits and pieces that m
 ## Solution
 
 Besides what is clear in the diagram, the proposed solution will consider:
+
 **Networking and Security**:
-- Routes and Routing tables
-- Restrict unnecessary incoming traffic via Security Groups and Network Access Control Lists
-- Provide egress (only) internet access to the ec2 and RDS instances via NAT GW
-- Provide ssh access to the EC2 instances only via Bastion host
-- Protection from DDOS and flooding attacks via AWS Shield and WAF
-- Enable Cloudtrail to monitor the activity of the IAM users
+- Routes and Routing tables.
+- Restrict unnecessary incoming traffic via Security Groups and Network Access Control Lists.
+- Provide egress (only) internet access to the ec2 and RDS instances via NAT GW.
+- Provide ssh access to the EC2 instances only via Bastion host.
+- Protection from DDOS and flooding attacks via AWS Shield and WAF.
+- Enable Cloudtrail to monitor the activity of the IAM users.
+
 **General functionalities**:
 - Web instances part of the Auto Scaling Group will have a minimum of one instance per Availability Zone.
 - A first image of the Web instance may be required to define the launch template of the autoscaling group.
+
 **Automation**:
 Most of the creation of the whole infra will be automated via Cloudformation. Some manual steps may be required as prerequisites to later create the Cloudformation stack. More details as the project progresses.
