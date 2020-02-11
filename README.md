@@ -3,7 +3,7 @@ AWS Infrastructure which includes Web app + RDS + all the bits and pieces that m
 
 ## Requirements
 
-1. Create a WordPress Web Site on hosted in AWS with a backend mysql/postgresql DB.
+1. Create a WordPress Web Site on hosted in AWS with a backend mysql (or postgresql) DB.
 2. Make sure the Web/application and DB tiers are highly redundant/available and fault tolerant.
 3. The DB servers should be to access the internet but incoming internet traffic to them should be blocked.
 4. Provide the Web and DB instances logging and alarming via Cloudwatch (elaborate a bit more on this).
