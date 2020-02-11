@@ -25,3 +25,5 @@ AWS Infrastructure which includes Web app + RDS + all the bits and pieces that m
 
 ## Proposed architecture
 
+![Diagram](https://github.com/carloshz4/aws-infra/blob/master/AWS-Infra.jpg)
+
