@@ -1,0 +1,697 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >-
+  Description": "This template creates the following objects:
+  VPC + IGW + Public and Private Subnets + Routing Tables +
+  Security Groups + NAT GW + Load Balancer + Mysql RDS +
+  Auto Scaling Group with Launch config and Auto Scaling policies.
+  The EC2 instances launched under the ASG automatically setup a basic php website
+  that connects to the RDS DB, and allows to populate and retrieve basic data.
+  There's also a Bastion host that can be used to reach the EC2 instances on the private networks.
+
+Parameters:
+  DBInstanceID:
+    Default: mysqldb
+    Description: Mysql DB Instance.
+    Type: String
+    MinLength: '1'
+    MaxLength: '63'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: >-
+      Must begin with a letter and must not end with a hyphen or contain two
+      consecutive hyphens.
+  DBName:
+    Default: mysqldb
+    Description: Database name.
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
+  DBInstanceClass:
+    Default: db.t2.micro
+    Description: DB instance class
+    Type: String
+    ConstraintDescription: Must select a valid DB instance type.
+  DBAllocatedStorage:
+    Default: '20'
+    Description: The size of the database (GiB)
+    Type: Number
+    MinValue: '20'
+    MaxValue: '1024'
+    ConstraintDescription: must be between 20 and 16384 GiB.
+  DBUsername:
+    Default: 'admin'
+ #   NoEcho: 'true'  # Uncomment this line to protect the username from being shown on the web console.
+    Description: Username for MySQL database access.
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBPassword:
+    Default: 'mypass123'
+ #   NoEcho: 'true'   # Uncomment this line to protect the password from being shown on the web console.
+    Description: Password MySQL database access.
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: must contain only alphanumeric characters.
+  KeyPair:
+    Type: String
+    Default: test-1-Nov-2018
+    Description: Enter name of pre-generated KeyPair # This keypair must exists on the relevant region otherwise the stack creation will fail.
+  VPCCidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.0.0/16
+    Description: Enter the CIDR block for your VPC
+  PublicSubnet1Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.1.0/24
+    Description: Enter the CIDR block for your Public Subnet 1
+  PublicSubnet2Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.2.0/24
+    Description: Enter the CIDR block for your Public Subnet 2
+  PrivateSubnet1Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.3.0/24
+    Description: Enter the CIDR block for your Private Subnet 1
+  PrivateSubnet2Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.4.0/24
+    Description: Enter the CIDR block for your Private Subnet 2
+  PrivateSubnet3Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.5.0/24
+    Description: Enter the CIDR block for your Private Subnet 3
+  PrivateSubnet4Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.6.0/24
+    Description: Enter the CIDR block for your Private Subnet 4
+  Region: 
+    Type: String
+    Default: us-east-2
+    AllowedValues: 
+      - eu-west-1
+      - eu-west-2
+      - eu-west-3
+      - eu-central-1
+      - us-west-2
+      - us-west-1
+      - us-east-2
+      - us-east-1
+      - ap-south-1
+      - ap-northeast-2
+      - ap-northeast-1
+      - ap-southeast-2
+      - ap-southeast-1
+      - ca-central-1
+      - sa-east-1
+    Description: Enter the AWS region to deploy stack. Default region is us-east-2 (Ohio)
+
+Mappings: 
+  RegionMap: 
+    eu-north-1:
+      HVM64: ami-008addc3a1dfef0db
+    ap-south-1:
+      HVM64: ami-0fa6cd5aefbf02afe
+    eu-west-3:
+      HVM64: ami-0080684933d20d931
+    eu-west-2:
+      HVM64: ami-00a1896be20551dc8
+    eu-west-1:
+      HVM64: ami-034d940df32c75d15
+    ap-northeast-2:
+      HVM64: ami-0e5ec6ec0e7672e12
+    ap-northeast-1:
+      HVM64: ami-0f28454baec625984
+    sa-east-1:
+      HVM64: ami-0a3433da868166413
+    ca-central-1:
+      HVM64: ami-0d2c1353f912735dd
+    ap-southeast-1:
+      HVM64: ami-075d28fa9524c24d8
+    ap-southeast-2:
+      HVM64: ami-0aaceffb9f9a60857
+    eu-central-1:
+      HVM64: ami-0df53967dc6eab09d
+    us-east-1:
+      HVM64: ami-09a5b0b7edf08843d
+    us-east-2:
+      HVM64: ami-01b01bbd08f24c7a8
+    us-west-1:
+      HVM64: ami-0c49b0cde84c02ad2
+    us-west-2:
+      HVM64: ami-07a6716a7f1ee6d61
+
+
+
+Resources:
+  VPClabcf:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidr
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+       - Key: Name
+         Value: VPCcf
+  IGWVPCcf:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: IGWVPCcf
+  IGWAttach:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPClabcf
+      InternetGatewayId: !Ref IGWVPCcf
+  PublicSubnet1cf:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: !Ref PublicSubnet1Cidr
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${Region}a
+      Tags:
+        - Key: Name
+          Value: PublicSubnet1cf
+      VpcId: !Ref VPClabcf
+  PublicSubnet2cf:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: !Ref PublicSubnet2Cidr
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${Region}b
+      Tags:
+        - Key: Name
+          Value: PublicSubnet2cf
+      VpcId: !Ref VPClabcf
+  PrivateSubnet1cf:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${Region}a
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet1cf
+      VpcId: !Ref VPClabcf
+  PrivateSubnet2cf:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${Region}b
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet2cf
+      VpcId: !Ref VPClabcf
+  PrivateSubnet3cf:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: !Ref PrivateSubnet3Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${Region}a
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet3cf
+      VpcId: !Ref VPClabcf
+  PrivateSubnet4cf:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: !Ref PrivateSubnet4Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${Region}b
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet4cf
+      VpcId: !Ref VPClabcf
+  DBSubnetGroupcf:       
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: Subnet group for RDS.
+      DBSubnetGroupName: RDSSubnetGroupcf
+      SubnetIds: 
+        - !Ref PrivateSubnet3cf
+        - !Ref PrivateSubnet4cf      
+  PublicRouteTablecf:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  
+        Ref: VPClabcf
+      Tags:
+      - Key: Name
+        Value: PublicRTcf
+  RoutetoInternet:
+    Type: AWS::EC2::Route
+    DependsOn: IGWAttach
+    Properties:
+       RouteTableId:
+         Ref: PublicRouteTablecf
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         Ref: IGWVPCcf
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTablecf
+      SubnetId: !Ref PublicSubnet1cf
+  PrivateRouteTablecf:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPClabcf
+      Tags:
+        - Key: Name
+          Value: PrivateRTcf   
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NATcf
+      RouteTableId: !Ref PrivateRouteTablecf  
+  PrivateRouteSubnetAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTablecf
+      SubnetId: !Ref PrivateSubnet1cf  
+  PrivateRouteSubnetAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTablecf
+      SubnetId: !Ref PrivateSubnet2cf
+  ALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for ALB
+      GroupName: ALBSG     
+      VpcId: !Ref VPClabcf
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ALBSG   
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Bastion Host
+      GroupName: BastionSG     
+      VpcId: !Ref VPClabcf
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name 
+          Value: BastionSG
+  MYSQLSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for mysql RDS
+      GroupName: MYSQLSG     
+      VpcId: !Ref VPClabcf
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref APPSG
+      Tags:
+        - Key: Name 
+          Value: MYSQLSG
+
+  APPSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security Group for the EC2 php instances to allow SSH from Bastion host and port 80 from internet (via ALBSG)
+      GroupName: APPSG     
+      VpcId: !Ref VPClabcf      
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionSG
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSG
+      Tags:
+        - Key: Name 
+          Value: APPSG
+  NATcf:
+    Type: AWS::EC2::NatGateway
+    Properties:
+        AllocationId:
+          Fn::GetAtt:
+          - EIP
+          - AllocationId
+        SubnetId:
+          Ref: PublicSubnet1cf
+        Tags:
+        - Key: Name
+          Value: NATgwcf
+  EIP:
+    DependsOn: IGWAttach
+    Type: AWS::EC2::EIP
+    Properties:
+        Domain: vpc
+        Tags:
+        - Key: Name
+          Value: EIPcf
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      IpAddressType: ipv4
+      Name: ALBcf
+      Scheme: internet-facing
+      SecurityGroups: 
+        - !Ref ALBSG
+      Subnets:
+        - !Ref PublicSubnet1cf 
+        - !Ref PublicSubnet2cf         
+      Type: application
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 80
+      Protocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /SamplePage.php
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200'
+      VpcId: !Ref VPClabcf  
+      Tags:
+        - Key: Name
+          Value: TargetGroupcf
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  mysqlDBcf:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBInstanceIdentifier: !Ref DBInstanceID
+      DBName: !Ref DBName
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      Engine: MySQL
+      EngineVersion: 5.7.26
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      BackupRetentionPeriod: 0
+      PubliclyAccessible: No
+      StorageType: gp2 
+      DBSubnetGroupName: !Ref DBSubnetGroupcf
+      MultiAZ: Yes
+      VPCSecurityGroups: 
+      - !Ref MYSQLSG
+
+  ASGcf:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+    - NATcf
+    Properties:
+      AutoScalingGroupName: ASGcf
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1cf
+        - !Ref PrivateSubnet2cf
+      TargetGroupARNs:
+        - Ref: TargetGroup
+      MinSize: '2'
+      MaxSize: '3'
+      LaunchConfigurationName: 
+        Ref: "LaunchConfigcf"
+
+  LaunchConfigcf: 
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties: 
+      KeyName: !Ref KeyPair
+      LaunchConfigurationName: LaunchConfigcf
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - HVM64
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            yum update -y
+            yum install -y httpd24 php56 php56-mysqlnd
+            service httpd start
+            chkconfig httpd on
+            groupadd www
+            usermod -a -G www ec2-user
+            chgrp -R www /var/www
+            chmod 2775 /var/www
+            find /var/www -type d -exec sudo chmod 2775 {} +
+            find /var/www -type f -exec sudo chmod 0664 {} +
+            cd /var/www
+            mkdir inc
+            cd inc
+            touch dbinfo.inc
+            echo "<?php" > /var/www/inc/dbinfo.inc
+            echo "define('DB_SERVER', '${mysqlDBcf.Endpoint.Address}');" >> /var/www/inc/dbinfo.inc
+            echo "define('DB_USERNAME', '${DBUsername}');" >> /var/www/inc/dbinfo.inc
+            echo "define('DB_PASSWORD', '${DBPassword}');" >> /var/www/inc/dbinfo.inc
+            echo "define('DB_DATABASE', '${DBName}');" >> /var/www/inc/dbinfo.inc
+            echo "?>" >> /var/www/inc/dbinfo.inc
+
+            cd /var/www/html
+            touch SamplePage.php
+            set +H
+
+            echo "<?php include \"../inc/dbinfo.inc\"; ?>" > /var/www/html/SamplePage.php
+            echo "<html>" >> /var/www/html/SamplePage.php
+            echo "<body>" >> /var/www/html/SamplePage.php
+            echo "<h1>Sample page</h1>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "<?php" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  /* Connect to MySQL and select the database. */" >> /var/www/html/SamplePage.php
+            echo "  \$connection = mysqli_connect(DB_SERVER, DB_USERNAME, DB_PASSWORD);" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  if (mysqli_connect_errno()) echo \"Failed to connect to MySQL: \" . mysqli_connect_error();" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  \$database = mysqli_select_db(\$connection, DB_DATABASE);" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  /* Ensure that the EMPLOYEES table exists. */" >> /var/www/html/SamplePage.php
+            echo "  VerifyEmployeesTable(\$connection, DB_DATABASE);" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  /* If input fields are populated, add a row to the EMPLOYEES table. */" >> /var/www/html/SamplePage.php
+            echo "  \$employee_name = htmlentities(\$_POST['NAME']);" >> /var/www/html/SamplePage.php
+            echo "  \$employee_address = htmlentities(\$_POST['ADDRESS']);" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  if (strlen(\$employee_name) || strlen(\$employee_address)) {" >> /var/www/html/SamplePage.php
+            echo "    AddEmployee(\$connection, \$employee_name, \$employee_address);" >> /var/www/html/SamplePage.php
+            echo "  }" >> /var/www/html/SamplePage.php
+            echo "?>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "<!-- Input form -->" >> /var/www/html/SamplePage.php
+            echo "<form action=\"<?PHP echo \$_SERVER['SCRIPT_NAME'] ?>\" method=\"POST\">" >> /var/www/html/SamplePage.php
+            echo "  <table border=\"0\">" >> /var/www/html/SamplePage.php
+            echo "    <tr>" >> /var/www/html/SamplePage.php
+            echo "      <td>NAME</td>" >> /var/www/html/SamplePage.php
+            echo "      <td>ADDRESS</td>" >> /var/www/html/SamplePage.php
+            echo "    </tr>" >> /var/www/html/SamplePage.php
+            echo "    <tr>" >> /var/www/html/SamplePage.php
+            echo "      <td>" >> /var/www/html/SamplePage.php
+            echo "        <input type=\"text\" name=\"NAME\" maxlength=\"45\" size=\"30\" />" >> /var/www/html/SamplePage.php
+            echo "      </td>" >> /var/www/html/SamplePage.php
+            echo "      <td>" >> /var/www/html/SamplePage.php
+            echo "        <input type=\"text\" name=\"ADDRESS\" maxlength=\"90\" size=\"60\" />" >> /var/www/html/SamplePage.php
+            echo "      </td>" >> /var/www/html/SamplePage.php
+            echo "      <td>" >> /var/www/html/SamplePage.php
+            echo "        <input type=\"submit\" value=\"Add Data\" />" >> /var/www/html/SamplePage.php
+            echo "      </td>" >> /var/www/html/SamplePage.php
+            echo "    </tr>" >> /var/www/html/SamplePage.php
+            echo "  </table>" >> /var/www/html/SamplePage.php
+            echo "</form>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "<!-- Display table data. -->" >> /var/www/html/SamplePage.php
+            echo "<table border=\"1\" cellpadding=\"2\" cellspacing=\"2\">" >> /var/www/html/SamplePage.php
+            echo "  <tr>" >> /var/www/html/SamplePage.php
+            echo "    <td>ID</td>" >> /var/www/html/SamplePage.php
+            echo "    <td>NAME</td>" >> /var/www/html/SamplePage.php
+            echo "    <td>ADDRESS</td>" >> /var/www/html/SamplePage.php
+            echo "  </tr>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "<?php" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "\$result = mysqli_query(\$connection, \"SELECT * FROM EMPLOYEES\");" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "while(\$query_data = mysqli_fetch_row(\$result)) {" >> /var/www/html/SamplePage.php
+            echo "  echo \"<tr>\";" >> /var/www/html/SamplePage.php
+            echo "  echo \"<td>\",\$query_data[0], \"</td>\"," >> /var/www/html/SamplePage.php
+            echo "       \"<td>\",\$query_data[1], \"</td>\"," >> /var/www/html/SamplePage.php
+            echo "       \"<td>\",\$query_data[2], \"</td>\";" >> /var/www/html/SamplePage.php
+            echo "  echo \"</tr>\";" >> /var/www/html/SamplePage.php
+            echo "}" >> /var/www/html/SamplePage.php
+            echo "?>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "</table>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "<!-- Clean up. -->" >> /var/www/html/SamplePage.php
+            echo "<?php" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  mysqli_free_result(\$result);" >> /var/www/html/SamplePage.php
+            echo "  mysqli_close(\$connection);" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "?>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "</body>" >> /var/www/html/SamplePage.php
+            echo "</html>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "<?php" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "/* Add an employee to the table. */" >> /var/www/html/SamplePage.php
+            echo "function AddEmployee(\$connection, \$name, \$address) {" >> /var/www/html/SamplePage.php
+            echo "   \$n = mysqli_real_escape_string(\$connection, \$name);" >> /var/www/html/SamplePage.php
+            echo "   \$a = mysqli_real_escape_string(\$connection, \$address);" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "   \$query = \"INSERT INTO EMPLOYEES (NAME, ADDRESS) VALUES ('\$n', '\$a');\";" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "   if(!mysqli_query(\$connection, \$query)) echo(\"<p>Error adding employee data.</p>\");" >> /var/www/html/SamplePage.php
+            echo "}" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "/* Check whether the table exists and, if not, create it. */" >> /var/www/html/SamplePage.php
+            echo "function VerifyEmployeesTable(\$connection, \$dbName) {" >> /var/www/html/SamplePage.php
+            echo "  if(!TableExists(\"EMPLOYEES\", \$connection, \$dbName))" >> /var/www/html/SamplePage.php
+            echo "  {" >> /var/www/html/SamplePage.php
+            echo "     \$query = \"CREATE TABLE EMPLOYEES (" >> /var/www/html/SamplePage.php
+            echo "         ID int(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY," >> /var/www/html/SamplePage.php
+            echo "         NAME VARCHAR(45)," >> /var/www/html/SamplePage.php
+            echo "         ADDRESS VARCHAR(90)" >> /var/www/html/SamplePage.php
+            echo "       )\";" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "     if(!mysqli_query(\$connection, \$query)) echo(\"<p>Error creating table.</p>\");" >> /var/www/html/SamplePage.php
+            echo "  }" >> /var/www/html/SamplePage.php
+            echo "}" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "/* Check for the existence of a table. */" >> /var/www/html/SamplePage.php
+            echo "function TableExists(\$tableName, \$connection, \$dbName) {" >> /var/www/html/SamplePage.php
+            echo "  \$t = mysqli_real_escape_string(\$connection, \$tableName);" >> /var/www/html/SamplePage.php
+            echo "  \$d = mysqli_real_escape_string(\$connection, \$dbName);" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  \$checktable = mysqli_query(\$connection," >> /var/www/html/SamplePage.php
+            echo "      \"SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_NAME = '\$t' AND TABLE_SCHEMA = '\$d'\");" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  if(mysqli_num_rows(\$checktable) > 0) return true;" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "  return false;" >> /var/www/html/SamplePage.php
+            echo "}" >> /var/www/html/SamplePage.php
+            echo "?>                        " >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+            echo "<?php" >> /var/www/html/SamplePage.php
+            echo "echo \"<br>\";" >> /var/www/html/SamplePage.php
+            echo "echo \"Instance id \n\";" >> /var/www/html/SamplePage.php
+            echo "echo @file_get_contents(\"http://instance-data/latest/meta-data/instance-id\");" >> /var/www/html/SamplePage.php
+            echo "?>" >> /var/www/html/SamplePage.php
+            echo "" >> /var/www/html/SamplePage.php
+      SecurityGroups: 
+        - !Ref APPSG
+      InstanceType: t2.nano
+
+  ASGScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName:
+        Ref: ASGcf
+      Cooldown: '60'
+      ScalingAdjustment: '1'
+  ASGScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName:
+        Ref: ASGcf
+      Cooldown: '60'
+      ScalingAdjustment: "-1"
+  CPUAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale-up if CPU > 80% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      AlarmName: CPUAlarmHighcf
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '1'
+      Threshold: '80'
+      AlarmActions:
+      - Ref: ASGScaleUpPolicy
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value:
+          Ref: ASGcf
+      ComparisonOperator: GreaterThanThreshold
+  CPUAlarmLowcf:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale-down if CPU < 20% for 20 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      AlarmName: CPUAlarmLowcf
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '4'
+      Threshold: '20'
+      AlarmActions:
+      - Ref: ASGScaleDownPolicy
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value:
+          Ref: ASGcf
+      ComparisonOperator: LessThanThreshold
+
+  bastion:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.nano
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - HVM64
+      KeyName: !Ref KeyPair  
+      SecurityGroupIds: 
+      - !Ref BastionSG   
+      Tags:
+        - Key: Name
+          Value: bastioncf
+      SubnetId: !Ref PublicSubnet1cf
+
+
+
+Outputs:
+  PageUrl:
+    Description: The URL to access the php site via ALB
+    Value: !Sub 'http://${LoadBalancer.DNSName}/SamplePage.php'
+  PublicIPBastion:
+    Description: Public IP address of the Bastion Host.
+    Value:
+      Fn::GetAtt:
+      - bastion
+      - PublicIp
