@@ -11,7 +11,7 @@ AWS Infrastructure which includes Web app + RDS + all the bits and pieces that m
 The following CF template builds the architecture represented in the diagram above:
 
 ```
-php-mysql-vpc.yml
+![php-mysql-vpc.yml](https://github.com/carloshz4/aws-infra/blob/master/php-mysql-vpc.yml)
 ```
 
 
