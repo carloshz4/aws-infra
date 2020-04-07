@@ -60,7 +60,7 @@ Parameters:
     ConstraintDescription: must contain only alphanumeric characters.
   KeyPair:
     Type: String
-    Default: test-1-Nov-2018
+    Default: testkp
     Description: Enter name of pre-generated KeyPair # This keypair must exists on the relevant region otherwise the stack creation will fail.
   VPCCidr:
     AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
