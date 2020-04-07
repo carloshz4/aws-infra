@@ -1,49 +1,38 @@
 # aws-infra
 AWS Infrastructure which includes Web app + RDS + all the bits and pieces that make it highly available, secured, resilient, automated.
 
-## Requirements
-
-1. Create a WordPress Web Site on hosted in AWS with a backend mysql (or postgresql) DB.
-2. Make sure the Web/application and DB tiers are highly redundant/available and fault tolerant.
-3. The DB and web servers should be able to access the internet but incoming internet traffic to them should be blocked.
-4. Provide the Web and DB instances logging and alarming via Cloudwatch (elaborate a bit more on this).
-5. Generate email notifications once any of the hosts exceeds 90% CPU usage, it is termated or becomes unavailable.
-6. Networking:
-	- Use a VPC class B
-	- Use multiple subnets class C
-	- Use load Balancing
-	- Restrict unnecesary ports and source IPs/networks. Only set up the minimun necesary
-	- Consider Location Redundancy
-	- Restrict direct access to the hosts from internet. 
-7. Security:
-	- Make sure only admin users can create, modify or delete infra.
-	- Give infra read access mode to relavant services and infra.
-	- Use roles when necessary.
-	- If possible protect from DDOS and flooding attacks.
-	- Monitor who makes changes to the infraestructure.
-
-
-## Proposed architecture
+## Diagram
 
 ![Diagram](https://github.com/carloshz4/aws-infra/blob/master/AWS-Infra.jpg)
 
 
+## Cloudformation template
 
-## Solution
+The following CF template builds the architecture represented in the diagram above:
 
-Besides what is clear in the diagram, the proposed solution will consider:
+''
+php-mysql-vpc.yml
+''
 
-**Networking and Security**:
-- Routes and Routing tables.
-- Restrict unnecessary incoming traffic via Security Groups and Network Access Control Lists.
-- Provide egress (only) internet access to the ec2 and RDS instances via NAT GW.
-- Provide ssh access to the EC2 instances only via Bastion host.
-- Protection from DDOS and flooding attacks via AWS Shield and WAF.
-- Enable Cloudtrail to monitor the activity of the IAM users.
 
-**General functionalities**:
-- Web instances part of the Auto Scaling Group will have a minimum of one instance per Availability Zone and scale out once the CPU usage is above 80% for more than 5min. On the other hand, the group will scale in once CPU usage is below 20% for more than 20min.
-- A first manually built image of the Web instance may be required to define the launch template of the autoscaling group. 
+## Explanation
 
-**Automation**:
-Most of the creation of the whole infra will be automated via Cloudformation. Some manual steps may be required as prerequisites to later create the Cloudformation stack. More details as the project progresses.
+The CF template:
+
+1. Creates a basic php Web Site hosted on AWS with a backend mysql DB (using RDS). It basically automates the manual creating followed in this page:
+![Php-mysql](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Tutorials.WebServerDB.CreateWebServer.html)
+2. The web servers and DB are located on private networks and highly available.
+3. The web servers launch as part of an autoscaling group and its setup and connection to the DB is done when booting up.
+4. An application load balancer is used to distribute the traffic.
+5. In terms of networking these elements are created to alocate the resources: VPC, Subnets, IGW, NAT GW, RT.
+6. In terms of security SG were created with restricted ports, servers cannot be access directly from internet but via a bastion host.
+
+
+## Pre-requisites
+
+1. Make sure you have a key pair created in the Region where you'll launch your CF Stack.
+2. Create a user with enough privileges to launch the stack along with the different objects.
+3. At the moment the template has the list of AMIs for each region. This ids may change in the future and will have to be listed again and included in the template. This could potentially be automated somehow. To get that list run the script **getaims.sh** in this repo. Note it used AWS cli. You need to provide the AMI name for instance:
+''./getaims.sh amzn-ami-hvm-2018.03.0.20200318.1-x86_64-gp2''
+
+Note it's important to use an Amazon Linux AMI (generation I), otherwise the bootstrap script won't work.
